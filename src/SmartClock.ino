@@ -1,16 +1,35 @@
 // This #include statement was automatically added by the Particle IDE.
+#include <neopixel.h>
+
+// This #include statement was automatically added by the Particle IDE.
 #include <Grove_LCD_RGB_Backlight.h>
 
 // This #include statement was automatically added by the Particle IDE.
 #include <SparkTime.h>
+#include <string>
+#include <sstream>
+//LED Stuff
+#define PIXEL_PIN D4
+#define PIXEL_COUNT 4
+#define PIXEL_TYPE WS2811
+Adafruit_NeoPixel strip = Adafruit_NeoPixel(PIXEL_COUNT, PIXEL_PIN, PIXEL_TYPE);
 
+int playSpeaker(String nothing);
+int Calculations(String wakeUpTime, String bedTime);
 
 int speakerPin = A4;
 int buttonPin = D2;
+int button2Pin = D5;
 
 bool ButtonNow = FALSE;//Create two states to compare so that the button doesn't continously count
 bool ButtonLast = FALSE;
+bool Button2Now = FALSE;
+bool Button2Last = FALSE;
 
+//Did speaker play in last 24 hours?
+bool didSpeakerPlay = FALSE;
+String bedTime;
+String wakeUpTime;//stored time when alarm button is pressed
 
 enum led_mode_t {
     OFF,
@@ -36,6 +55,9 @@ const int colorB = 122;
 
 void setup() {
 
+    //Speaker function
+    Particle.function("Speaker", playSpeaker);
+
     // set up the LCD's number of columns and rows:
     lcd.begin(16, 2);
 
@@ -52,6 +74,7 @@ void setup() {
 
     //Button stuff
     pinMode(buttonPin, INPUT_PULLDOWN);
+    pinMode(button2Pin, INPUT_PULLDOWN);
     Serial.begin(9600);
 }
 
@@ -82,32 +105,117 @@ void loop() {
         timeStr = "";
 
     }
+
+    //Is it midnight? If so...24 hour reset!
+    if(timeStr == "12:00 AM")
+    {
+        didSpeakerPlay = FALSE;//Speaker did not play today
+    }
+
     //Update the time
     lastTime = currentTime;
 
-    //play alarm if the mode is ON
-    if (mode == ON)
+    //Bedtime button
+    if(Button2Now == HIGH && Button2Last == LOW)
+	{
+    	bedTime=currentTime;
+	}
+    //Did IFTTT Send Event?
+    //When there is 15 minutes before event, a trigger to playSpeaker(); is called
+
+}
+
+int playSpeaker(String nothing)
+{
+
+    if(didSpeakerPlay == FALSE)//Plays speaker for first time in the day
+    {   //play alarm if the mode is ON
+        while(mode == ON)
+        {
+            //the pin, the frequency of tone in hertz, the duration of tone in milliseconds
+            tone(speakerPin, 880, 1000);
+            delay(1100);
+            tone(speakerPin, 440, 1000);
+            delay(1100);
+
+            ButtonNow = digitalRead(buttonPin);
+
+            if(ButtonNow == HIGH && ButtonLast == LOW)//button is pressed
+            {
+                mode = OFF;
+                noTone(speakerPin);
+                wakeUpTime = timeStr;
+                //Call the calculations function to send sleep time and get hours
+                int hrsSlept = calculations(wakeUpTime, bedTime);
+                //Call the LED function - pass hours
+               leds(hrsSlept);
+            }
+            else if (ButtonNow == LOW)
+            {
+                ButtonLast = LOW;
+            }
+        }
+
+    }
+    //SORRY the alarm already played today! No more alarms
+  return 0;
+}
+
+int calculations(String wakeUpTime, String bedTime)
+{
+    //Parse wake up time string into hours and minutes
+    int whrs = atoi(wakeUpTime.substring(0,wakeUpTime.indexOf(":")));
+    int wmins = atoi(wakeUpTime.substring(wakeUpTime.indexOf(":")+1, 2));
+    //Parse bed time string into hours and minutes
+    int bhrs = atoi(bedTime.substring(0,bedTime.indexOf(":")));
+    int bmins = atoi(bedTime.substring(bedTime.indexOf(":")+1, 2));
+    //Subtract the hours and store as hoursSlept
+    int hrsSlept = (12 - bhrs) + whrs;
+    //Subtract the minutes and store as minutes slept
+    int minsSlept = bmins + wmins;
+    //If minutes are greater then 59, do mod and add an hourSlept
+    if(minsSlept >= 60)
     {
-        //the pin, the frequency of tone in hertz, the duration of tone in milliseconds
-        tone(speakerPin, 880, 1000);
-        delay(1100);
-        tone(speakerPin, 440, 1000);
-        delay(1100);
+        minsSlept = minsSlept % 60;
+        hrsSlept++;
+    }
+    //Store hoursSlept and minutesSlept as 1 string and sent to excel
+
+    wakeUpTime = "Hours slept: " + String(hrsSlept) + " Minutes Slept: " + String(minsSlept);
+    Spark.publish("timeSlept", wakeUpTime);
+
+    return hrsSlept;
+
+}
+
+void leds(int x)
+{
+
+     unsigned long holdTime = currentTime + 10000;
+
+    if ( x >=8 )
+    {
+    	while (currentTime <= holdTime)
+    	{
+        	int PixelColorGreen = strip.Color( 0, 128, 0);
+
+        	strip.setPixelColor(0, PixelColorGreen);
+        	strip.setPixelColor(1, PixelColorGreen);
+        	strip.setPixelColor(2, PixelColorGreen);
+        	strip.show();
+    	}
     }
     else
     {
-    noTone(speakerPin);
+     	while (currentTime <= holdTime)
+     	{
+        	int PixelColorRed = strip.Color( 80, 0, 4);
+        	strip.setPixelColor(0, PixelColorRed);
+        	strip.setPixelColor(1, PixelColorRed);
+        	strip.setPixelColor(2, PixelColorRed);
+        	strip.show();
+    	}
+
     }
 
-    ButtonNow = digitalRead(buttonPin);
-
-    if(ButtonNow == HIGH && ButtonLast == LOW)
-    {
-        mode = ON;
-
-    }
-    else if (ButtonNow == LOW)
-    {
-        ButtonLast = OFF;
-    }
 }
