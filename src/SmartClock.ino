@@ -6,9 +6,12 @@
 
 //LED Stuff
 #define PIXEL_PIN D4
-#define PIXEL_COUNT 4
+#define PIXEL_COUNT 2
 #define PIXEL_TYPE WS2811
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(PIXEL_COUNT, PIXEL_PIN, PIXEL_TYPE);
+int PixelColorOff = strip.Color( 0, 0, 0);
+int PixelColorGreen = strip.Color( 0, 128, 0);
+int PixelColorRed = strip.Color( 80, 0, 4);
 
 rgb_lcd lcd;
 const int colorR = 122;
@@ -18,6 +21,7 @@ const int colorB = 122;
 //Functions
 int playSpeaker(String nothing);
 int Calculations(String wakeUpTime, String bedTime);
+void alarmHandler(const char *event, const char *data);
 
 //Pins
 int speakerPin = A4;
@@ -48,9 +52,13 @@ enum led_mode_t {
 led_mode_t mode = ON;
 
 void setup() {
+    //LED off
+    strip.begin();
+    strip.show();
 
-    //Speaker function
+    //Speaker function for IFTTT
     Particle.function("Speaker", playSpeaker);
+    Particle.subscribe("Alarm", alarmHandler);
 
     // set up the LCD's number of columns and rows:
     lcd.begin(16, 2);
@@ -73,6 +81,10 @@ void setup() {
 }
 
 void loop() {
+  //LED set off
+  strip.setPixelColor(0, PixelColorOff);
+  strip.setPixelColor(1,PixelColorOff);
+  strip.show();
 
     // set the cursor to column 0, line 1
     // (note: line 1 is the second row, since counting begins with 0):
@@ -95,9 +107,6 @@ void loop() {
 	    // print the time string
         lcd.print(timeStr);
 
-        delay(1000);
-        timeStr = "";
-
     }
 
     //Is it midnight? If so...24 hour reset!
@@ -111,12 +120,12 @@ void loop() {
 
     //Bedtime button
     if(Button2Now == HIGH && Button2Last == LOW)
-	{
+	   {
     	bedTime=currentTime;
-	}
+	   }
     //Did IFTTT Send Event?
     //When there is 15 minutes before event, a trigger to playSpeaker(); is called
-
+    timeStr = "";
 }
 
 int playSpeaker(String nothing)
@@ -193,31 +202,27 @@ int calculations(String wakeUpTime, String bedTime)
 void leds(int x)
 {
 
-     unsigned long holdTime = currentTime + 10000;
-
     if ( x >=8 )
     {
-    	while (currentTime <= holdTime)
-    	{
-        	int PixelColorGreen = strip.Color( 0, 128, 0);
-
         	strip.setPixelColor(0, PixelColorGreen);
         	strip.setPixelColor(1, PixelColorGreen);
-        	strip.setPixelColor(2, PixelColorGreen);
         	strip.show();
-    	}
+
     }
     else
     {
-     	while (currentTime <= holdTime)
-     	{
-        	int PixelColorRed = strip.Color( 80, 0, 4);
         	strip.setPixelColor(0, PixelColorRed);
         	strip.setPixelColor(1, PixelColorRed);
-        	strip.setPixelColor(2, PixelColorRed);
         	strip.show();
-    	}
 
     }
+    //strip.setPixelColor(0, PixelColorOff);
+    //strip.setPixelColor(1, PixelColorOff);
+    //strip.show();
+    delay(3000);
+}
 
+void alarmHandler(const char *event, const char *data)
+{
+  playSpeaker(data);
 }
