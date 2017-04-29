@@ -1,57 +1,51 @@
-// This #include statement was automatically added by the Particle IDE.
 #include <neopixel.h>
-
-// This #include statement was automatically added by the Particle IDE.
 #include <Grove_LCD_RGB_Backlight.h>
-
-// This #include statement was automatically added by the Particle IDE.
 #include <SparkTime.h>
 #include <string>
 #include <sstream>
+
 //LED Stuff
 #define PIXEL_PIN D4
 #define PIXEL_COUNT 4
 #define PIXEL_TYPE WS2811
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(PIXEL_COUNT, PIXEL_PIN, PIXEL_TYPE);
 
+rgb_lcd lcd;
+const int colorR = 122;
+const int colorG = 122;
+const int colorB = 122;
+
+//Functions
 int playSpeaker(String nothing);
 int Calculations(String wakeUpTime, String bedTime);
 
+//Pins
 int speakerPin = A4;
 int buttonPin = D2;
 int button2Pin = D5;
 
+//Button Stuff
 bool ButtonNow = FALSE;//Create two states to compare so that the button doesn't continously count
 bool ButtonLast = FALSE;
 bool Button2Now = FALSE;
 bool Button2Last = FALSE;
+bool didSpeakerPlay = FALSE;//Did speaker play in last 24 hours?
 
-//Did speaker play in last 24 hours?
-bool didSpeakerPlay = FALSE;
+//Time stuff
 String bedTime;
 String wakeUpTime;//stored time when alarm button is pressed
+UDP UDPClient;
+SparkTime rtc;
+unsigned long currentTime;
+unsigned long lastTime = 0UL;
+String timeStr;
+
 
 enum led_mode_t {
     OFF,
     ON,
 };
 led_mode_t mode = ON;
-
-//Timer variables
-UDP UDPClient;
-SparkTime rtc;
-
-unsigned long currentTime;
-unsigned long lastTime = 0UL;
-String timeStr;
-
-//LCD variables
-rgb_lcd lcd;
-
-const int colorR = 122;
-const int colorG = 122;
-const int colorB = 122;
-
 
 void setup() {
 
@@ -169,8 +163,16 @@ int calculations(String wakeUpTime, String bedTime)
     //Parse bed time string into hours and minutes
     int bhrs = atoi(bedTime.substring(0,bedTime.indexOf(":")));
     int bmins = atoi(bedTime.substring(bedTime.indexOf(":")+1, 2));
+    int hrsSlept;
     //Subtract the hours and store as hoursSlept
-    int hrsSlept = (12 - bhrs) + whrs;
+    if(bhrs > 8)
+    {
+        hrsSlept = (12 - bhrs) + whrs;//ex (12 -9) + 6
+    }
+    else
+    {
+        hrsSlept = whrs - bhrs;//ex 6 - 1
+    }
     //Subtract the minutes and store as minutes slept
     int minsSlept = bmins + wmins;
     //If minutes are greater then 59, do mod and add an hourSlept
