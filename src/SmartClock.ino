@@ -2,7 +2,7 @@
 #include <Grove_LCD_RGB_Backlight.h>
 #include <SparkTime.h>
 #include <string>
-#include <sstream>
+
 
 //LED Stuff
 #define PIXEL_PIN D4
@@ -36,7 +36,7 @@ bool Button2Last = FALSE;
 bool didSpeakerPlay = FALSE;//Did speaker play in last 24 hours?
 
 //Time stuff
-String bedTime;
+String bedTime = "10:30";
 String wakeUpTime;//stored time when alarm button is pressed
 UDP UDPClient;
 SparkTime rtc;
@@ -164,26 +164,56 @@ int playSpeaker(String nothing)
   return 0;
 }
 
-int calculations(String wakeUpTime, String bedTime)
+int calculations(String& wakeUpTime, String& bedTime)
 {
-    //Parse wake up time string into hours and minutes
-    int whrs = atoi(wakeUpTime.substring(0,wakeUpTime.indexOf(":")));
-    int wmins = atoi(wakeUpTime.substring(wakeUpTime.indexOf(":")+1, 2));
-    //Parse bed time string into hours and minutes
-    int bhrs = atoi(bedTime.substring(0,bedTime.indexOf(":")));
-    int bmins = atoi(bedTime.substring(bedTime.indexOf(":")+1, 2));
-    int hrsSlept;
-    //Subtract the hours and store as hoursSlept
-    if(bhrs > 8)
+    String WHRS;
+    String BHRS;
+    String WMINS;
+    String BMINS;
+
+    //Is it a two digit or 1 digit hour
+    if(wakeUpTime.substring(0,1) == "0")//09:10
     {
-        hrsSlept = (12 - bhrs) + whrs;//ex (12 -9) + 6
+      //Parse wake up time string into hours and minutes
+      WHRS = wakeUpTime.substring(1,2);
+      Serial.print(WHRS);
+      Serial.print("There is one digit");
+    }
+    else//10:13
+    {
+      //Parse bedtime string into hours and minutes
+      WHRS = wakeUpTime.substring(0,2);
+      Serial.print(WHRS);
+      Serial.print("There are two digits");
+    }
+    WMINS = wakeUpTime.substring(3, 5);
+    Serial.print("These are the wake up mins: ");
+    Serial.print(WMINS);
+
+    if(bedTime.substring(0,1) == "0")
+    {
+      //Parse bed time string into hours and minutes
+      BHRS = bedTime.substring(1,2);
     }
     else
     {
-        hrsSlept = whrs - bhrs;//ex 6 - 1
+      //Parse bed time string into hours and minutes
+      BHRS = bedTime.substring(0,2);
+    }
+    BMINS = bedTime.substring(3,5);
+
+    int hrsSlept;
+    //Subtract the hours and store as hoursSlept
+    if(BHRS.toInt() > 8)
+    {
+        hrsSlept = (12 - BHRS.toInt()) + WHRS.toInt() - 1;//ex (12 -9) + 6
+    }
+    else
+    {
+        hrsSlept = WHRS.toInt() - BHRS.toInt() - 1;//ex 6 - 1
     }
     //Subtract the minutes and store as minutes slept
-    int minsSlept = bmins + wmins;
+    int minsSlept = (60-BMINS.toInt()) + WMINS.toInt();
     //If minutes are greater then 59, do mod and add an hourSlept
     if(minsSlept >= 60)
     {
@@ -196,7 +226,6 @@ int calculations(String wakeUpTime, String bedTime)
     Spark.publish("timeSlept", wakeUpTime);
 
     return hrsSlept;
-
 }
 
 void leds(int x)
@@ -216,9 +245,7 @@ void leds(int x)
         	strip.show();
 
     }
-    //strip.setPixelColor(0, PixelColorOff);
-    //strip.setPixelColor(1, PixelColorOff);
-    //strip.show();
+
     delay(3000);
 }
 
